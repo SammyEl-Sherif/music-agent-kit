@@ -4,6 +4,9 @@ __pycache__/
 # Machine-local Claude settings (personal paths, permissions)
 .claude/settings.local.json
 
+# API credentials (e.g. DISCOGS_TOKEN for rekordbox-metadata)
+.env
+
 # Audio outputs — samples/stems produced by skills stay out of git
 *.wav
 *.aiff
