@@ -150,9 +150,32 @@ def write_tags(path: Path, changes: dict) -> tuple[list[str], dict]:
             # rekordbox (and Pioneer hardware) only read ID3v2.3 — mutagen's
             # default v2.4 tags are invisible there, especially in WAV chunks.
             audio.save(v2_version=3)
+            if path.suffix.lower() == ".wav":
+                _uppercase_wav_id3_chunk(path)
         else:
             audio.save()
     return written, skipped
+
+
+def _uppercase_wav_id3_chunk(path: Path) -> bool:
+    """Rename mutagen's lowercase 'id3 ' RIFF chunk to 'ID3 '. rekordbox only
+    recognizes the uppercase id; mutagen reads either, so this is lossless."""
+    import struct
+    with open(path, "r+b") as fh:
+        if fh.read(4) != b"RIFF":
+            return False
+        pos = 12
+        while True:
+            fh.seek(pos)
+            hdr = fh.read(8)
+            if len(hdr) < 8:
+                return False
+            cid, size = hdr[:4], struct.unpack("<I", hdr[4:8])[0]
+            if cid == b"id3 ":
+                fh.seek(pos)
+                fh.write(b"ID3 ")
+                return True
+            pos += 8 + size + (size % 2)
 
 
 def merge_changes(current: dict, proposed: dict, allow_overwrite: bool) -> tuple[dict, dict]:
