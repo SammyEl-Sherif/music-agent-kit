@@ -77,11 +77,12 @@ def download_audio(url: str, workdir: Path) -> Path:
     return audio
 
 
-def separate_vocals(audio: Path, workdir: Path, model: str) -> tuple[Path, Path]:
+def separate_vocals(audio: Path, workdir: Path, model: str, device: str) -> tuple[Path, Path]:
     """Run demucs in two-stems mode; return (vocals, instrumental) WAV paths."""
     sep_root = workdir / "separated"
     proc = run(
-        ["demucs", "--two-stems", "vocals", "-n", model, "-o", str(sep_root), str(audio)],
+        ["demucs", "--two-stems", "vocals", "-n", model, "-d", device,
+         "-o", str(sep_root), str(audio)],
         stdout=None,  # demucs prints its own progress bar; let it through
     )
     if proc.returncode != 0:
@@ -115,6 +116,11 @@ def main() -> None:
         "--model", default="htdemucs",
         help="demucs model name (default: htdemucs)",
     )
+    p.add_argument(
+        "--device", default="cpu",
+        help="torch device for demucs (default: cpu -- Apple's MPS backend "
+             "cannot run htdemucs; pass 'cuda' on an NVIDIA machine)",
+    )
     args = p.parse_args()
 
     check_deps()
@@ -124,7 +130,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="vocals-") as tmp:
         workdir = Path(tmp)
         audio = download_audio(args.url, workdir)
-        vocals, instrumental = separate_vocals(audio, workdir, args.model)
+        vocals, instrumental = separate_vocals(audio, workdir, args.model, args.device)
 
         base = safe_name(audio.stem)
         vocals_out = out_dir / f"{base} (vocals).wav"

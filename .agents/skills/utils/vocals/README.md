@@ -41,7 +41,9 @@ Or just ask Claude: *"grab the vocals from this YouTube link and put them in
 
 ## Notes
 
-- Demucs runs on CPU by default; expect roughly 1–3× the track's length.
+- Demucs runs on CPU by default (Apple's MPS backend can't run htdemucs;
+  `--device cuda` works on NVIDIA machines). A ~4-minute track separates in
+  about a minute on an Apple Silicon CPU.
 - `--model htdemucs_ft` is slower but slightly cleaner than the default.
 - Non-destructive: intermediates live in a temp dir and are cleaned up; only
   the stems you asked for are kept.

@@ -55,6 +55,8 @@ Options:
   track) next to the vocals.
 - `--model htdemucs` — demucs model (default `htdemucs`; `htdemucs_ft` is
   slower but slightly cleaner).
+- `--device cpu` — torch device (default `cpu`; Apple's MPS backend cannot run
+  htdemucs, so leave the default on a Mac; pass `cuda` on an NVIDIA machine).
 
 Demucs runs on CPU by default and takes roughly 1–3× the track length — tell
 the user it may take a few minutes and let it run.
