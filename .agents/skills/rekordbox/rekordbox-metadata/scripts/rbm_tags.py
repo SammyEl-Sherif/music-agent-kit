@@ -146,7 +146,12 @@ def write_tags(path: Path, changes: dict) -> tuple[list[str], dict]:
             written.append(field)
 
     if written:
-        audio.save()
+        if kind == "id3":
+            # rekordbox (and Pioneer hardware) only read ID3v2.3 — mutagen's
+            # default v2.4 tags are invisible there, especially in WAV chunks.
+            audio.save(v2_version=3)
+        else:
+            audio.save()
     return written, skipped
 
 
