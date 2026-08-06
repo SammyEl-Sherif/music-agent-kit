@@ -43,14 +43,26 @@ class LookupCache:
 
 
 def _throttled_get(url: str, headers: dict) -> dict:
+    """GET with the shared 1 req/s throttle and backoff retries on 5xx/429
+    (MusicBrainz intermittently 503s under load)."""
     global _last_request_ts
-    wait = RATE_LIMIT_SECONDS - (time.time() - _last_request_ts)
-    if wait > 0:
-        time.sleep(wait)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **headers})
-    _last_request_ts = time.time()
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    last_err: Exception = RuntimeError("unreachable")
+    for attempt, backoff in enumerate((0, 4, 10)):
+        if backoff:
+            time.sleep(backoff)
+        wait = RATE_LIMIT_SECONDS - (time.time() - _last_request_ts)
+        if wait > 0:
+            time.sleep(wait)
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **headers})
+        _last_request_ts = time.time()
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code not in (429, 500, 502, 503, 504):
+                raise
+    raise last_err
 
 
 def mb_search(artist: str, title: str, cache: LookupCache) -> list[dict]:
