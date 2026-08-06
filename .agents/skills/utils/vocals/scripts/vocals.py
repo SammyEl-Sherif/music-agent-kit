@@ -121,6 +121,10 @@ def main() -> None:
         help="torch device for demucs (default: cpu -- Apple's MPS backend "
              "cannot run htdemucs; pass 'cuda' on an NVIDIA machine)",
     )
+    p.add_argument(
+        "--no-reveal", action="store_true",
+        help="don't open the enclosing folder in Finder when done",
+    )
     args = p.parse_args()
 
     check_deps()
@@ -139,6 +143,11 @@ def main() -> None:
             inst_out = out_dir / f"{base} (instrumental).wav"
             shutil.move(str(instrumental), inst_out)
             print(f"instrumental: {inst_out}")
+
+    # Reveal the result in Finder: opens the enclosing folder with the vocal
+    # file selected. macOS only; skipped elsewhere or with --no-reveal.
+    if not args.no_reveal and sys.platform == "darwin" and shutil.which("open"):
+        subprocess.run(["open", "-R", str(vocals_out)], check=False)
 
     # Final line, machine-readable: the isolated vocal sample's absolute path.
     print(f"VOCALS: {vocals_out}")

@@ -36,6 +36,9 @@ Output:
 VOCALS: /Users/you/Music/samples/Song Title (vocals).wav
 ```
 
+When it finishes, Finder opens the enclosing folder with the vocal file
+selected (skip with `--no-reveal`).
+
 Or just ask Claude: *"grab the vocals from this YouTube link and put them in
 ~/Music/samples"*.
 

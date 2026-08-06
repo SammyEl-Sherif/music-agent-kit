@@ -57,15 +57,19 @@ Options:
   slower but slightly cleaner).
 - `--device cpu` — torch device (default `cpu`; Apple's MPS backend cannot run
   htdemucs, so leave the default on a Mac; pass `cuda` on an NVIDIA machine).
+- `--no-reveal` — skip the Finder reveal at the end (see Step 3).
 
 Demucs runs on CPU by default and takes roughly 1–3× the track length — tell
 the user it may take a few minutes and let it run.
 
 ### Step 3 — Relay the result
 
-The last line of output is `VOCALS: <absolute path>`. Give the user that path
-(and the instrumental's, if kept). Offer to play it, open its folder, or feed
-it into another skill (e.g. audio-converter to compress it).
+On success the script **opens the enclosing folder in Finder** with the vocal
+file selected (`open -R`; macOS only, disable with `--no-reveal`), so the user
+lands right on the sample. The last line of output is
+`VOCALS: <absolute path>` — relay that path too (and the instrumental's, if
+kept). Offer to play it or feed it into another skill (e.g. audio-converter to
+compress it).
 
 ## Guardrails
 
