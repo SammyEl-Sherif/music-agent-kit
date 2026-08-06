@@ -70,6 +70,23 @@ check("yt id stripped", p["title"], "Comes and Goes")
 check("yt id kept remix", p["remixer"], "Dom Dolla")
 p = parse_filename("Artist - Song [COUNTRYBOYZ]")
 check("11-char word not treated as yt id", "[COUNTRYBOYZ]" in p["title"], True)
+p = parse_filename("Mos Def - Ms. Fat Booty (Louis Futon Remix) [WQU_hxWhCRU]")
+check("yt id with underscore stripped", p["title"], "Ms. Fat Booty")
+check("yt id underscore remixer", p["remixer"], "Louis Futon")
+
+# Standalone (Audio)/(Video)-style junk groups
+p = parse_filename("Drake - Yebbas Heartbreak (Audio)")
+check("standalone audio group junk", p["title"], "Yebbas Heartbreak")
+p = parse_filename("Artist - Song (Video)")
+check("standalone video group junk", p["title"], "Song")
+
+# "... Version"/"... Mix" prefixes are named takes, not remixer credits
+p = parse_filename("Coldplay - Clocks (2006 Latin Version)")
+check("version prefix not a remixer", p["remixer"], "")
+check("named version preserved", p["version_info"], "2006 Latin Version")
+p = parse_filename("Artist - Song (Labor Of Love Mix)")
+check("named mix not a remixer", p["remixer"], "")
+check("named mix preserved", p["version_info"], "Labor Of Love Mix")
 
 # Normalization but NOT title-casing
 p = parse_filename("MGMT - Electric Feel")

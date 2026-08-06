@@ -40,7 +40,9 @@ JUNK_GROUP_RE = re.compile(
     r"official\s+(?:video|audio|music\s+video|visualizer)|lyric\s+video|"
     r"lyrics?\s+video|visualizer|audio\s+only|free\s+(?:dl|download)|"
     r"out\s+now|premiere|full\s+stream|nocopyright|copyright\s+free|"
-    r"\d{2,4}\s*kbps|www\.|\.com|\.net|\.org|monstercat\s+release",
+    r"\d{2,4}\s*kbps|www\.|\.com|\.net|\.org|monstercat\s+release|"
+    r"^\s*(?:hd\s+|hq\s+)?audio\s*$|^\s*(?:music\s+)?video\s*$|"
+    r"^\s*(?:official|lyrics?)\s*$",
     re.IGNORECASE,
 )
 
@@ -75,8 +77,9 @@ def strip_track_number(s: str) -> str:
     return TRACKNUM_RE.sub("", s)
 
 
-def strip_junk(s: str) -> str:
-    s = URL_RE.sub(" ", s)
+def strip_youtube_ids(s: str) -> str:
+    """Remove yt-dlp [videoid] suffixes. Must run on the RAW string, before
+    underscore normalization turns [WQU_hxWhCRU] into [WQU hxWhCRU]."""
 
     def _yt_id(m: re.Match) -> str:
         inner = m.group(0)[1:-1]
@@ -86,7 +89,12 @@ def strip_junk(s: str) -> str:
             return m.group(0)
         return " "
 
-    s = YOUTUBE_ID_RE.sub(_yt_id, s)
+    return YOUTUBE_ID_RE.sub(_yt_id, s)
+
+
+def strip_junk(s: str) -> str:
+    s = URL_RE.sub(" ", s)
+    s = strip_youtube_ids(s)
     s = GROUP_RE.sub(lambda m: " " if JUNK_GROUP_RE.search(m.group(1)) else m.group(0), s)
     # Peel technical tokens off the end (WEB 320, FLAC, 320kbps ...)
     parts = s.strip().split(" ")
@@ -107,9 +115,13 @@ def _is_version_group(text: str) -> bool:
 
 
 def _extract_remixer(version_text: str) -> str:
-    """"Eric Prydz Remix" -> "Eric Prydz"; "Club Mix" -> "" (generic)."""
+    """"Eric Prydz Remix" -> "Eric Prydz"; "Club Mix" -> "" (generic).
+
+    Only true remixer-credit shapes count: "X Remix/Rework/Refix/Flip/Bootleg".
+    "... Mix" / "... Version" / "... Edit" prefixes are named takes, not
+    remixer credits ("Labor Of Love Mix", "2006 Latin Version")."""
     m = re.match(
-        r"^(.*?)\s+(?:remix|rework|refix|flip|bootleg|edit|re-edit|dub|mix|version)e?s?$",
+        r"^(.*?)\s+(?:remix|rework|refix|flip|bootleg)e?s?$",
         version_text.strip(), re.IGNORECASE,
     )
     if not m:
@@ -180,9 +192,10 @@ def parse_filename(stem: str) -> dict:
     Returns a dict with: artist, title, version_info, featured, remixer.
     Empty string means "could not determine" — never a guess.
     """
-    # Track numbers are stripped from the RAW stem: "03_Artist" still shows its
-    # "_" separator there, which normalization would blur into a plain space.
-    s = strip_track_number(stem)
+    # Track numbers and [videoid] suffixes are stripped from the RAW stem:
+    # "03_Artist" and "[WQU_hxWhCRU]" both lose their tell-tale "_" once
+    # normalization blurs it into a plain space.
+    s = strip_youtube_ids(strip_track_number(stem))
     s = normalize_separators(s)
     s = strip_junk(s)
 
@@ -218,7 +231,7 @@ def parse_filename(stem: str) -> dict:
 def clean_tag_title(title: str) -> dict:
     """Clean an existing (possibly messy) title TAG the same way, without the
     artist-split step unless the tag itself embeds 'Artist - Title'."""
-    s = strip_junk(normalize_separators(strip_track_number(title)))
+    s = strip_junk(normalize_separators(strip_youtube_ids(strip_track_number(title))))
     base, versions, featured, remixer = split_versions(s)
     return {
         "title": base.strip(),
