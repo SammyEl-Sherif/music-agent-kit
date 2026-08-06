@@ -64,6 +64,13 @@ check("junk group + kbps removed", p["title"], "Song")
 p = parse_filename("Artist - Song (Official Audio)")
 check("official audio group removed", p["title"], "Song")
 
+# yt-dlp video-id suffixes are junk; single-case bracket words are title text
+p = parse_filename("KETTAMA - Comes and Goes (Dom Dolla Remix) [kl0wXWFppQo]")
+check("yt id stripped", p["title"], "Comes and Goes")
+check("yt id kept remix", p["remixer"], "Dom Dolla")
+p = parse_filename("Artist - Song [COUNTRYBOYZ]")
+check("11-char word not treated as yt id", "[COUNTRYBOYZ]" in p["title"], True)
+
 # Normalization but NOT title-casing
 p = parse_filename("MGMT - Electric Feel")
 check("case preserved upper", p["artist"], "MGMT")

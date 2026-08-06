@@ -45,6 +45,8 @@ JUNK_GROUP_RE = re.compile(
 )
 
 URL_RE = re.compile(r"(?:https?://|www\.)\S+|\b\S+\.(?:com|net|org|info)\b\S*", re.IGNORECASE)
+# yt-dlp-style video-id suffix: an 11-char [id] bracket group (e.g. [kl0wXWFppQo])
+YOUTUBE_ID_RE = re.compile(r"[(\[][A-Za-z0-9_-]{11}[)\]]")
 FEAT_RE = re.compile(r"\b(?:feat\.?|ft\.?|featuring)\s+(.+)", re.IGNORECASE)
 GROUP_RE = re.compile(r"[(\[]([^()\[\]]+)[)\]]")
 TRACKNUM_RE = re.compile(
@@ -75,6 +77,16 @@ def strip_track_number(s: str) -> str:
 
 def strip_junk(s: str) -> str:
     s = URL_RE.sub(" ", s)
+
+    def _yt_id(m: re.Match) -> str:
+        inner = m.group(0)[1:-1]
+        # A plain single-case word ("[COUNTRYBOYZ]") is title text, not an id;
+        # real video ids mix case, digits, or -_ .
+        if inner.isalpha() and (inner.islower() or inner.isupper() or inner.istitle()):
+            return m.group(0)
+        return " "
+
+    s = YOUTUBE_ID_RE.sub(_yt_id, s)
     s = GROUP_RE.sub(lambda m: " " if JUNK_GROUP_RE.search(m.group(1)) else m.group(0), s)
     # Peel technical tokens off the end (WEB 320, FLAC, 320kbps ...)
     parts = s.strip().split(" ")

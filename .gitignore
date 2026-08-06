@@ -7,6 +7,9 @@ __pycache__/
 # API credentials (e.g. DISCOGS_TOKEN for rekordbox-metadata)
 .env
 
+# Machine-local rekordbox-metadata config (personal paths)
+rekordbox-metadata.yaml
+
 # Audio outputs — samples/stems produced by skills stay out of git
 *.wav
 *.aiff
