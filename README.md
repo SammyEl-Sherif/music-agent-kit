@@ -27,6 +27,10 @@ credit to him for the design and implementation.
 - **[version-finder](.agents/skills/rekordbox/version-finder/)** — ask "what
   versions of this track do I have?" and get a read-only table of every
   version, edit, and remix in your library. Changes nothing.
+- **[rekordbox-metadata](.agents/skills/rekordbox/rekordbox-metadata/)** —
+  clean, identify, and enrich track metadata: scan for broken tags, parse
+  messy filenames, look up MusicBrainz/Discogs, review and approve proposals,
+  apply to audio tags with backups, then sync into rekordbox via Reload Tag.
 
 ### ableton
 
