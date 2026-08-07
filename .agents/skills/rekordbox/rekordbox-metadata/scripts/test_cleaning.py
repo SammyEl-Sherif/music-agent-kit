@@ -88,6 +88,16 @@ p = parse_filename("Artist - Song (Labor Of Love Mix)")
 check("named mix not a remixer", p["remixer"], "")
 check("named mix preserved", p["version_info"], "Labor Of Love Mix")
 
+# Download-site suffixes and fullwidth pipe separators
+p = parse_filename("2thestars_KLICKAUD")
+check("klickaud suffix stripped", p["title"], "2thestars")
+p = parse_filename("Deadmau5_-_Strobe_KREAM_Remix_With_Frank_Ocean_KLICKAUD")
+check("klickaud after title", p["title"], "Strobe KREAM Remix With Frank Ocean")
+p = parse_filename("Disco Lines - Waste Your Love ft. morgxn and Kwon (Official Audio) ｜ Insomniac Records")
+check("fullwidth pipe artist", p["artist"], "Disco Lines")
+check("fullwidth pipe title", p["title"], "Waste Your Love")
+check("fullwidth pipe feat trimmed", p["featured"], "morgxn and Kwon")
+
 # Normalization but NOT title-casing
 p = parse_filename("MGMT - Electric Feel")
 check("case preserved upper", p["artist"], "MGMT")

@@ -33,6 +33,7 @@ TECH_TOKENS = {
     "web", "webrip", "rip", "vinylrip", "cdrip", "promo", "retail", "cbr",
     "vbr", "mp3", "flac", "wav", "m4a", "aac", "aiff", "hq", "hd", "4k",
     "128", "160", "192", "224", "256", "320", "kbps",
+    "klickaud",  # klickaud.co download suffix
 }
 
 # A bracketed group is junk (removed entirely) if it contains one of these.
@@ -65,7 +66,7 @@ def normalize_separators(s: str) -> str:
     s = s.replace("_", " ")
     for dash in "‒–—‐":
         s = s.replace(dash, "-")
-    s = re.sub(r"\s*[|•]\s*", " - ", s)
+    s = re.sub(r"\s*[|｜•]\s*", " - ", s)  # incl. fullwidth ｜ from YouTube titles
     s = re.sub(r"\s*-\s*-+\s*", " - ", s)  # repeated hyphens -> one separator
     s = re.sub(r"\s+", " ", s)
     return s.strip()
@@ -167,10 +168,11 @@ def split_versions(title: str) -> tuple[str, list[str], str, str]:
 
     base = GROUP_RE.sub(_take, title)
 
-    # Inline feat without parentheses: "Song feat. Kim"
+    # Inline feat without parentheses: "Song feat. Kim". A " - Label" tail
+    # after the featured names (YouTube "｜ Label" style) is dropped, not kept.
     fm = FEAT_RE.search(base)
     if fm and not featured:
-        featured = fm.group(1).strip()
+        featured = fm.group(1).split(" - ")[0].strip()
         base = base[: fm.start()].rstrip(" -")
 
     # Trailing " - Club Mix" style segment
