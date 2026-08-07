@@ -283,25 +283,40 @@ def main() -> int:
     db = get_db()
     index = build_playlist_index(db)
     pid = str(args.playlist_id)
-    if pid not in index:
-        raise SystemExit(f"No playlist with id {pid}. Run resolve_playlist.py first.")
 
-    target = index[pid]
-    target_path = playlist_path(index, pid)
-    if is_excluded(target_path, exclude_terms):
-        raise SystemExit(
-            f"Target playlist '{target_path}' matches an exclude term "
-            f"({exclude_terms}) and is protected. Nothing to do. "
-            f"Use --exclude-path '' to override."
-        )
-    # get_playlist_contents does not exclude tombstoned (rb_local_deleted=1)
-    # memberships -- removals pending cloud-sync upload -- so intersect with the
-    # playlist's live song rows; otherwise an already-removed track would be
-    # re-detected as a duplicate.
-    live_ids = {str(r.ContentID) for r in db.get_playlist_songs()
-                .filter(tables.DjmdSongPlaylist.PlaylistID == pid,
-                        tables.DjmdSongPlaylist.rb_local_deleted == 0).all()}
-    contents = [c for c in db.get_playlist_contents(target) if str(c.ID) in live_ids]
+    if pid.lower() in ("collection", "all"):
+        # Collection mode: dedupe the ENTIRE library, not one playlist. Every
+        # live (non-tombstoned) content row is a candidate. Still read-only.
+        # Note for the apply step: there is no target playlist, so removals
+        # only make sense with scope "everywhere"; losers that live in no
+        # playlist have no playlist rows to act on -- removing them from the
+        # Collection itself is done in rekordbox by the user, guided by the
+        # manifest (this skill never deletes Collection entries or files).
+        pid = "collection"
+        target_name, target_path = "Collection", "Collection"
+        contents = [c for c in db.get_content()
+                    if not getattr(c, "rb_local_deleted", 0)]
+    else:
+        if pid not in index:
+            raise SystemExit(f"No playlist with id {pid}. Run resolve_playlist.py first.")
+
+        target = index[pid]
+        target_name = target.Name
+        target_path = playlist_path(index, pid)
+        if is_excluded(target_path, exclude_terms):
+            raise SystemExit(
+                f"Target playlist '{target_path}' matches an exclude term "
+                f"({exclude_terms}) and is protected. Nothing to do. "
+                f"Use --exclude-path '' to override."
+            )
+        # get_playlist_contents does not exclude tombstoned (rb_local_deleted=1)
+        # memberships -- removals pending cloud-sync upload -- so intersect with the
+        # playlist's live song rows; otherwise an already-removed track would be
+        # re-detected as a duplicate.
+        live_ids = {str(r.ContentID) for r in db.get_playlist_songs()
+                    .filter(tables.DjmdSongPlaylist.PlaylistID == pid,
+                            tables.DjmdSongPlaylist.rb_local_deleted == 0).all()}
+        contents = [c for c in db.get_playlist_contents(target) if str(c.ID) in live_ids]
     tracks = [track_facts(c) for c in contents]
 
     groups = cluster_duplicates(tracks, args.title_threshold, args.artist_threshold)
@@ -367,7 +382,7 @@ def main() -> int:
 
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "playlist": {"id": pid, "name": target.Name, "path": playlist_path(index, pid)},
+        "playlist": {"id": pid, "name": target_name, "path": target_path},
         "thresholds": {"title": args.title_threshold, "artist": args.artist_threshold},
         "exclude_path_terms": exclude_terms,
         "protected_playlists_skipped": protected,
