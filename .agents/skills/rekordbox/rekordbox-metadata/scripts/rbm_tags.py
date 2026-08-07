@@ -152,9 +152,89 @@ def write_tags(path: Path, changes: dict) -> tuple[list[str], dict]:
             audio.save(v2_version=3)
             if path.suffix.lower() == ".wav":
                 _uppercase_wav_id3_chunk(path)
+                # rekordbox reads WAV metadata from the RIFF LIST/INFO chunk,
+                # not ID3 — write both so rekordbox AND ID3-aware tools see it.
+                _rewrite_wav_info_chunk(path, read_tags(path))
         else:
             audio.save()
     return written, skipped
+
+
+# logical field -> RIFF INFO subchunk id (what rekordbox reads for WAV)
+INFO_IDS = {
+    "title": b"INAM", "artist": b"IART", "album": b"IPRD",
+    "genre": b"IGNR", "year": b"ICRD",
+}
+
+
+def _rewrite_wav_info_chunk(path: Path, fields: dict) -> bool:
+    """Rebuild the WAV with a LIST/INFO chunk carrying the given fields,
+    placed before the data chunk. Existing INFO subchunks we don't set (e.g.
+    ISFT encoder) are preserved; every other chunk passes through untouched.
+    Audio bytes are never modified; the file is replaced atomically."""
+    import os
+    import struct
+    import tempfile
+
+    with open(path, "rb") as fh:
+        riff = fh.read(12)
+        if riff[:4] != b"RIFF" or riff[8:12] != b"WAVE":
+            return False
+        chunks = []  # (cid, data)
+        while True:
+            hdr = fh.read(8)
+            if len(hdr) < 8:
+                break
+            cid, size = hdr[:4], struct.unpack("<I", hdr[4:8])[0]
+            data = fh.read(size)
+            if size % 2:
+                fh.read(1)
+            chunks.append((cid, data))
+
+    # Collect subchunks from any existing INFO list, ours winning
+    preserved: dict[bytes, bytes] = {}
+    for cid, data in chunks:
+        if cid == b"LIST" and data[:4] == b"INFO":
+            pos = 4
+            while pos + 8 <= len(data):
+                sub, ssize = data[pos:pos + 4], struct.unpack("<I", data[pos + 4:pos + 8])[0]
+                preserved[sub] = data[pos + 8:pos + 8 + ssize]
+                pos += 8 + ssize + (ssize % 2)
+
+    for field, sub_id in INFO_IDS.items():
+        val = str(fields.get(field) or "").strip()
+        if val:
+            preserved[sub_id] = val.encode("utf-8") + b"\x00"
+
+    info = b"INFO"
+    for sub_id, val in preserved.items():
+        if not val.endswith(b"\x00"):
+            val += b"\x00"
+        info += sub_id + struct.pack("<I", len(val)) + val + (b"\x00" if len(val) % 2 else b"")
+
+    out = b""
+    info_written = False
+    for cid, data in chunks:
+        if cid == b"LIST" and data[:4] == b"INFO":
+            continue  # replaced by the rebuilt INFO list
+        if cid == b"data" and not info_written:
+            out += b"LIST" + struct.pack("<I", len(info)) + info + (b"\x00" if len(info) % 2 else b"")
+            info_written = True
+        out += cid + struct.pack("<I", len(data)) + data + (b"\x00" if len(data) % 2 else b"")
+    if not info_written:
+        out += b"LIST" + struct.pack("<I", len(info)) + info + (b"\x00" if len(info) % 2 else b"")
+
+    payload = b"WAVE" + out
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".wav.tmp")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(b"RIFF" + struct.pack("<I", len(payload)) + payload)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+    return True
 
 
 def _uppercase_wav_id3_chunk(path: Path) -> bool:
