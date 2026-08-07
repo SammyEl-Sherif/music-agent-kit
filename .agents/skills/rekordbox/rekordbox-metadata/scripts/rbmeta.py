@@ -61,6 +61,42 @@ def looks_suspicious(tags: dict, stem: str) -> list[str]:
     return flags
 
 
+def rekordbox_staleness_flags(tags: dict, rb_title: str, rb_artist: str, stem: str) -> list[str]:
+    """Pure helper: does rekordbox's stored metadata lag the file's tags?
+    (i.e. the track needs a Reload Tag, not a lookup)."""
+    flags = set()
+    ft = (tags.get("title") or "").strip()
+    fa = (tags.get("artist") or "").strip()
+    rb_title = (rb_title or "").strip()
+    rb_artist = (rb_artist or "").strip()
+    if ft and (not rb_title or rb_title == stem or rb_title != ft):
+        flags.add("rekordbox_title_stale")
+    if fa and (not rb_artist or rb_artist != fa):
+        flags.add("rekordbox_artist_stale")
+    return sorted(flags)
+
+
+def collect_rekordbox_tracks():
+    """READ-ONLY enumeration of the rekordbox Collection: every track's file
+    path plus the Title/Artist rekordbox currently displays. Never writes."""
+    try:
+        from pyrekordbox import Rekordbox6Database
+    except ImportError:
+        fail("pyrekordbox is not installed — install with: pip3 install pyrekordbox --break-system-packages")
+    db = Rekordbox6Database()
+    out = []
+    for c in db.get_content():
+        fp = c.FolderPath or ""
+        if not fp or getattr(c, "rb_local_deleted", 0):
+            continue
+        out.append({
+            "path": fp,
+            "rb_title": c.Title or "",
+            "rb_artist": (c.Artist.Name if c.Artist else "") or "",
+        })
+    return out
+
+
 def cmd_scan(args):
     cfg_path = config.find_config(args.config)
     if cfg_path is None:
@@ -69,22 +105,41 @@ def cmd_scan(args):
         print("Edit music_directory (and the backup/review dirs) there, then re-run scan.")
         return
     cfg, cfg_path = get_config(args)
-    music_dir = cfg["music_directory"]
-    if not music_dir.exists():
-        fail(f"music_directory does not exist: {music_dir}")
 
     try:
         import rbm_tags as tags_mod
     except Exception as e:  # pragma: no cover
         fail(str(e))
 
-    files = sorted(p for p in music_dir.rglob("*") if p.suffix.lower() in AUDIO_EXTS and p.is_file())
-    if args.limit:
-        files = files[: args.limit]
-    print(f"Scanning {len(files)} audio files under {music_dir} …")
+    rb_meta: dict[str, dict] = {}
+    if args.from_rekordbox:
+        collection = collect_rekordbox_tracks()
+        entries = []
+        for t in collection:
+            p = Path(t["path"])
+            if p.suffix.lower() in AUDIO_EXTS:
+                entries.append(p)
+                rb_meta[str(p)] = t
+        if args.limit:
+            entries = entries[: args.limit]
+        files = entries
+        print(f"Scanning {len(files)} tracks from the rekordbox Collection (read-only) …")
+        source = "rekordbox collection"
+    else:
+        music_dir = cfg["music_directory"]
+        if not music_dir.exists():
+            fail(f"music_directory does not exist: {music_dir}")
+        files = sorted(p for p in music_dir.rglob("*") if p.suffix.lower() in AUDIO_EXTS and p.is_file())
+        if args.limit:
+            files = files[: args.limit]
+        print(f"Scanning {len(files)} audio files under {music_dir} …")
+        source = str(music_dir)
 
-    tracks, errors = [], []
+    tracks, errors, missing = [], [], []
     for f in files:
+        if not f.exists():
+            missing.append(str(f))
+            continue
         try:
             tags = tags_mod.read_tags(f)
             dur = tags_mod.duration_seconds(f)
@@ -93,20 +148,30 @@ def cmd_scan(args):
             continue
         flags = looks_suspicious(tags, f.stem)
         parsed = cleaning.parse_filename(f.stem)
-        tracks.append({
+        track = {
             "file_path": str(f),
             "original_filename": f.name,
             "tags": tags,
             "duration": round(dur, 1),
             "flags": flags,
             "parsed": parsed,
-        })
+        }
+        rb = rb_meta.get(str(f))
+        if rb:
+            track["rekordbox"] = {"title": rb["rb_title"], "artist": rb["rb_artist"]}
+            track["rb_stale"] = rekordbox_staleness_flags(tags, rb["rb_title"], rb["rb_artist"], f.stem)
+        tracks.append(track)
 
     flagged = [t for t in tracks if t["flags"]]
-    payload = {"music_directory": str(music_dir), "scanned": len(tracks), "flagged": len(flagged), "tracks": tracks}
+    stale = [t for t in tracks if t.get("rb_stale")]
+    payload = {"music_directory": source, "scanned": len(tracks), "flagged": len(flagged), "tracks": tracks}
     out = store.save_scan(cfg["review_directory"], payload)
 
     print(f"\nScanned {len(tracks)} files; {len(flagged)} flagged as missing/suspicious.")
+    if missing:
+        print(f"{len(missing)} Collection entries point at files that no longer exist (first 5):")
+        for m in missing[:5]:
+            print(f"  ! {m}")
     if errors:
         print(f"{len(errors)} unreadable files (first 5):")
         for e in errors[:5]:
@@ -115,6 +180,12 @@ def cmd_scan(args):
         print(f"  - {t['original_filename']}  [{', '.join(t['flags'])}]")
     if len(flagged) > 40:
         print(f"  … and {len(flagged) - 40} more")
+    if stale:
+        print(f"\n{len(stale)} track(s) have file tags newer than what rekordbox shows (need Reload Tag, not lookup):")
+        for t in stale[:15]:
+            print(f"  ~ {t['original_filename']}  [{', '.join(t['rb_stale'])}]")
+        if len(stale) > 15:
+            print(f"  … and {len(stale) - 15} more")
     print(f"\nScan results: {out}")
     print("Next: `clean --dry-run` to preview title cleanup, then `lookup`.")
 
@@ -487,6 +558,9 @@ def main():
 
     s = sub.add_parser("scan", help="scan the music directory for missing/suspicious metadata")
     s.add_argument("--limit", type=int, help="scan at most N files")
+    s.add_argument("--from-rekordbox", action="store_true",
+                   help="scan the files in the rekordbox Collection (read-only DB access) "
+                        "instead of walking music_directory")
     s.set_defaults(func=cmd_scan)
 
     s = sub.add_parser("clean", help="preview filename/title cleanup (dry run only)")

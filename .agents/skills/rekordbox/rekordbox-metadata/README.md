@@ -13,7 +13,7 @@ grids, playlists, ratings, and My Tags are never touched.
 
 | Command | What it does | Writes? |
 | --- | --- | --- |
-| `scan` | Find tracks with missing/suspicious artist & title tags | no |
+| `scan` | Find tracks with missing/suspicious artist & title tags (`--from-rekordbox` scans the Collection's files instead of a folder) | no |
 | `clean --dry-run` | Preview filename→metadata cleanup (`01 - Daft_Punk_-_One_More_Time_(Club_Mix)_WEB_320.mp3` → Daft Punk / One More Time / Club Mix) | no |
 | `lookup` | Search MusicBrainz + Discogs, score candidates, build `review.csv` | no |
 | `review` | Show proposals, confidence, and reasoning; approve/reject | review file only |

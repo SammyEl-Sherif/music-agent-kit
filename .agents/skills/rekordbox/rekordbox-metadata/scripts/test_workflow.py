@@ -115,6 +115,21 @@ with tempfile.TemporaryDirectory() as tmp:
     check("audit has timestamp", "timestamp" in entry)
     check("audit has sync status", entry["rekordbox_sync_status"] == "synced")
 
+# --- rekordbox staleness detection (pure logic; no DB needed)
+from rbmeta import rekordbox_staleness_flags  # noqa: E402
+
+f = rekordbox_staleness_flags({"title": "Real Title", "artist": "Real Artist"},
+                              "some_file_name", "", "some_file_name")
+check("stale when rb shows filename stem", "rekordbox_title_stale" in f)
+check("stale when rb artist empty", "rekordbox_artist_stale" in f)
+f = rekordbox_staleness_flags({"title": "Real Title", "artist": "Real Artist"},
+                              "Real Title", "Real Artist", "whatever")
+check("in-sync track not stale", f == [])
+f = rekordbox_staleness_flags({}, "Anything", "Anyone", "stem")
+check("untagged file never stale", f == [])
+f = rekordbox_staleness_flags({"title": "New Title"}, "Old Title", "", "stem")
+check("differing title is stale", f == ["rekordbox_title_stale"])
+
 if FAILURES:
     print(f"FAILED {len(FAILURES)} check(s):")
     for f in FAILURES:

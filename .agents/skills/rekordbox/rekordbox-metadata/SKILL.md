@@ -59,7 +59,7 @@ maps 1:1 onto these subcommands.
 ### 1. `scan` — find problem tracks (read-only)
 
 ```
-python3 scripts/rbmeta.py scan [--limit N]
+python3 scripts/rbmeta.py scan [--limit N] [--from-rekordbox]
 ```
 
 Walks `music_directory` (mp3/flac/m4a/wav/aiff), reads embedded tags, and flags
@@ -67,6 +67,15 @@ tracks with missing artist/title, placeholder artists, filename-shaped titles
 (underscores, leading track numbers, WEB/320-style junk), or artist embedded in
 the title. Writes `scan.json` to the review directory. Relay the counts and the
 flagged list.
+
+`--from-rekordbox` scans the **rekordbox Collection** instead of a folder: it
+enumerates every Collection track's file path via pyrekordbox (**read-only**,
+never writes the DB; needs `pip3 install pyrekordbox --break-system-packages`)
+and scans those exact files wherever they live on disk. Prefer this when the
+user's library spans many folders — it guarantees every scanned file is one
+rekordbox actually references, reports Collection entries whose files are
+missing, and additionally lists tracks whose FILE tags are newer than what
+rekordbox displays (those need a Reload Tag, not a lookup).
 
 ### 2. `clean --dry-run` — preview title cleanup (writes nothing)
 
