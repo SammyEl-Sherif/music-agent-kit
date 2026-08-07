@@ -93,10 +93,25 @@ def strip_youtube_ids(s: str) -> str:
     return YOUTUBE_ID_RE.sub(_yt_id, s)
 
 
+def _clean_group(m: re.Match) -> str:
+    """Drop a junk bracket group — but if it ALSO carries version info
+    ("(MPH Remix - Official Audio)"), keep the version part instead of eating
+    it: version info is never discarded."""
+    inner = m.group(1)
+    if not JUNK_GROUP_RE.search(inner):
+        return m.group(0)
+    if _is_version_group(inner):
+        kept = [seg for seg in re.split(r"\s+-\s+|\s*[,;/]\s*", inner)
+                if seg.strip() and not JUNK_GROUP_RE.search(seg) and _is_version_group(seg)]
+        if kept:
+            return "(" + " - ".join(seg.strip() for seg in kept) + ")"
+    return " "
+
+
 def strip_junk(s: str) -> str:
     s = URL_RE.sub(" ", s)
     s = strip_youtube_ids(s)
-    s = GROUP_RE.sub(lambda m: " " if JUNK_GROUP_RE.search(m.group(1)) else m.group(0), s)
+    s = GROUP_RE.sub(_clean_group, s)
     # Peel technical tokens off the end (WEB 320, FLAC, 320kbps ...)
     parts = s.strip().split(" ")
     while parts:

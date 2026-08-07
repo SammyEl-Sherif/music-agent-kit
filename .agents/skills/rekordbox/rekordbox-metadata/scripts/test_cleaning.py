@@ -88,6 +88,15 @@ p = parse_filename("Artist - Song (Labor Of Love Mix)")
 check("named mix not a remixer", p["remixer"], "")
 check("named mix preserved", p["version_info"], "Labor Of Love Mix")
 
+# A junk group that also carries version info keeps the version part
+p = parse_filename("Calvin Harris - I'm Not Alone (MPH Remix - Official Audio)")
+check("mixed junk/version keeps remix", p["version_info"], "MPH Remix")
+check("mixed junk/version remixer", p["remixer"], "MPH")
+check("mixed junk/version title", p["title"], "I'm Not Alone")
+p = parse_filename("Artist - Song (Extended Mix) (Official Audio)")
+check("separate junk group still dropped", p["title"], "Song")
+check("separate version group kept", p["version_info"], "Extended Mix")
+
 # Download-site suffixes and fullwidth pipe separators
 p = parse_filename("2thestars_KLICKAUD")
 check("klickaud suffix stripped", p["title"], "2thestars")
