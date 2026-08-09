@@ -31,6 +31,10 @@ credit to him for the design and implementation.
   clean, identify, and enrich track metadata: scan for broken tags, parse
   messy filenames, look up MusicBrainz/Discogs, review and approve proposals,
   apply to audio tags with backups, then sync into rekordbox via Reload Tag.
+- **[track-centralizer](.agents/skills/rekordbox/track-centralizer/)** —
+  gather every file your collection points at into one folder you choose:
+  collision-safe moves that never rename or overwrite, an undo manifest, and
+  a guided Auto Relocate in rekordbox afterwards. Never writes the database.
 
 ### ableton
 
@@ -44,6 +48,10 @@ credit to him for the design and implementation.
   between WAV, AIFF, and AAC using macOS's built-in `afconvert` (nothing to
   install). Non-destructive; refuses lossy→lossless and same-format
   conversions.
+- **[track-downloader](.agents/skills/utils/track-downloader/)** — give it a
+  YouTube link and get the best-quality audio as a WAV dropped straight into
+  `~/Music/Track Collection`, idempotent by video id. Import into rekordbox
+  afterwards — never touches the database.
 - **[vocals](.agents/skills/utils/vocals/)** — give it a YouTube link; yt-dlp
   downloads the audio, demucs splits it, and you get an isolated vocal WAV at
   a path you choose (`--out-dir`).
