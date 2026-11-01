@@ -233,8 +233,11 @@ def snapshot_playlists(db, tables, index, affected, human_stamp):
         title = f"{name} - {BACKUP_SUFFIX} - {human_stamp}"
         new_pl = db.create_playlist(title, parent=parent)
 
+        # Live rows only: tombstoned rows (rb_local_deleted=1) are earlier
+        # removals and must not come back in the snapshot.
         rows = (db.get_playlist_songs()
-                .filter(tables.DjmdSongPlaylist.PlaylistID == pid).all())
+                .filter(tables.DjmdSongPlaylist.PlaylistID == pid,
+                        tables.DjmdSongPlaylist.rb_local_deleted == 0).all())
         rows.sort(key=lambda r: int(r.TrackNo or 0))
         for seq, r in enumerate(rows, 1):
             db.add_to_playlist(new_pl, str(r.ContentID), track_no=seq)
