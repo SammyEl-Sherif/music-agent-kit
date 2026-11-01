@@ -74,8 +74,10 @@ def main() -> int:
         service, source_id = source
         artist = readable(content.ArtistName) if hasattr(content, "ArtistName") else ""
         title = readable(content.Title)
-        if service == "spotify" and not title:
-            artist, title = spotify_name(source_id)
+        # rekordbox may encrypt the artist, the title, or both.
+        if service == "spotify" and not (artist and title):
+            sp_artist, sp_title = spotify_name(source_id)
+            artist, title = sp_artist or artist, sp_title or title
         tracks.append({
             "position": pos,
             "song_id": str(row.ID),
@@ -85,7 +87,7 @@ def main() -> int:
             "folder_path": content.FolderPath,
             "artist": artist,
             "title": title,
-            "name": display_name(artist, title) if title else "",
+            "name": display_name(artist, title, uploader=service == "soundcloud") if title else "",
             "length": int(content.Length or 0),
             "candidates": [],
             "pick": None,

@@ -49,7 +49,7 @@ def yt_search(query: str, n: int = 6) -> list[dict]:
 
 def search_track(t: dict) -> str:
     """Fill in t's candidates, pick and suggestion. Returns a one-line label."""
-    query = search_query(t["artist"], t["title"])
+    query = search_query(t["name"])
     seen, cands = set(), []
     for q in (query, f"{query} extended mix"):
         for c in yt_search(q):
@@ -87,7 +87,7 @@ def main() -> int:
         raise SystemExit("yt-dlp is missing: brew install yt-dlp")
 
     manifest = load_manifest(args.manifest)
-    only = {int(p) for p in args.only.split(",")} if args.only else None
+    only = {int(p) for p in args.only.split(",") if p.strip()} if args.only else None
 
     for t in manifest["tracks"]:
         if only is not None and t["position"] not in only:

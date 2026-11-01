@@ -25,14 +25,17 @@ ENCRYPTED_PREFIX = "$A7:"
 JUNK_WORDS = ("live", "slowed", "sped up", "reverb", "1 hour", "full set",
               "dj set", "mashup", "karaoke", "instrumental", "cover", "reaction",
               "lyrics")
-EXTENDED_WORDS = ("extended", "club mix", "12\"", "night version")
+# "Original Mix" counts only when clearly longer: on dance releases that is
+# usually the full-length version of a radio edit.
+EXTENDED_WORDS = ("extended", "club mix", "12\"", "night version", "original mix")
 # Words that make a bracketed part of a title a version tag, e.g. "(X Remix)".
 VERSION_WORDS = {"remix", "edit", "mix", "flip", "rework", "dub", "bootleg", "vip"}
 # Uploader promo text in SoundCloud titles, dropped before searching.
 PROMO = re.compile(r"\b(free (download|dl)|out now|with no outro|no outro|premiere)\b.*$", re.I)
 
 # Words too generic to prove two titles are the same song.
-GENERIC_WORDS = {"the", "a", "an", "and", "of", "to", "in", "on", "my", "me", "i", "u",
+# Pronouns stay distinctive: "Give It To Me" is not "Give It To Ya".
+GENERIC_WORDS = {"the", "a", "an", "and", "of", "to", "in", "on",
                  "feat", "ft", "featuring", "with", "x", "vs", "mix", "remix", "edit",
                  "version", "original", "extended", "radio", "official", "audio",
                  "video", "visualizer", "lyric", "music", "hd", "4k", "full", "stream",
@@ -61,18 +64,22 @@ def clean_title(title: str) -> str:
     return PROMO.sub("", title or "").strip(" -|")
 
 
-def display_name(artist: str, title: str) -> str:
-    """'Artist - Title'. A title that already contains ' - ' carries its own
-    artist (SoundCloud's artist field is often just the uploader)."""
+def display_name(artist: str, title: str, uploader: bool = False) -> str:
+    """'Artist - Title'. Pass uploader=True when the artist field may just be
+    whoever uploaded it (SoundCloud): then a title that already contains
+    ' - ' is taken to carry its own artist. Spotify titles like
+    'Song - X Remix' keep their real artist."""
     artist, title = artist.strip(), clean_title(title)
-    if not artist or " - " in title or title.lower().startswith(artist.lower()):
+    if not artist or title.lower().startswith(artist.lower()):
+        return title
+    if uploader and " - " in title:
         return title
     return f"{artist} - {title}"
 
 
-def search_query(artist: str, title: str) -> str:
-    """A YouTube search string from the display name, brackets and dashes flattened."""
-    text = display_name(artist, title)
+def search_query(name: str) -> str:
+    """A YouTube search string from a display name, brackets and dashes flattened."""
+    text = name
     text = re.sub(r"[()\[\]{}|｜]", " ", text)
     text = re.sub(r"\s+-\s+", " ", text)
     return re.sub(r"\s+", " ", text).strip()
@@ -85,8 +92,9 @@ def title_tokens(text: str) -> set[str]:
 
 
 def drop_feat(text: str) -> str:
-    """Remove featured-artist credits, which uploads often leave out."""
-    return re.sub(r"[(\[]?\b(feat|ft|featuring)\b\.?[^)\]]*[)\]]?", " ", text or "", flags=re.I)
+    """Remove featured-artist credits ('feat. X', '(with X)'), which uploads often leave out."""
+    text = re.sub(r"[(\[]\s*with\b[^)\]]*[)\]]", " ", text or "", flags=re.I)
+    return re.sub(r"[(\[]?\b(feat|ft|featuring)\b\.?[^)\]]*[)\]]?", " ", text, flags=re.I)
 
 
 def coverage(want: str, got: str) -> float:

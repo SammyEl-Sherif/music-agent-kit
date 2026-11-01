@@ -30,7 +30,7 @@ check(display_name("MPH", "One Sixty") == "MPH - One Sixty", "artist joined")
 check(display_name("MPH", "MPH - Raw") == "MPH - Raw", "artist not repeated")
 check(display_name("", "Pile Up") == "Pile Up", "no artist")
 
-check(search_query("Prospa", "This Rhythm (feat. RAHH)") == "Prospa This Rhythm feat. RAHH",
+check(search_query("Prospa - This Rhythm (feat. RAHH)") == "Prospa This Rhythm feat. RAHH",
       "query flattens brackets")
 
 cands = [
@@ -66,9 +66,21 @@ check(rank_candidates(own, 171, "I Got Nothing - Ferreck Dawn Mix")[0]["video_id
 vis = [{"video_id": "v", "duration": 287, "channel": "Nina Simone", "title": "See-Line Woman (Mochakk Mix / Visualizer)"}]
 check(rank_candidates(vis, 287, "See-Line Woman - Mochakk Mix")[0]["score"] > 10, "visualizer tag is not a remix")
 
-check(display_name("francesco verrillo", "Shakedown - At Night (Edit)") == "Shakedown - At Night (Edit)",
-      "uploader dropped when title has its own artist")
+check(display_name("francesco verrillo", "Shakedown - At Night (Edit)", uploader=True)
+      == "Shakedown - At Night (Edit)", "uploader dropped when title has its own artist")
+check(display_name("Jamie Jones", "Gets Like That - Jamie Jones Remix")
+      == "Jamie Jones - Gets Like That - Jamie Jones Remix", "real artist kept on a ' - Remix' title")
 check(clean_title("Song (Flip) FREE DOWNLOAD WITH NO OUTRO") == "Song (Flip)", "promo text stripped")
+
+ya = [{"video_id": "y", "duration": 385, "channel": "PHM", "title": "Late Replies - Give It To Ya (Original Mix)"}]
+check(rank_candidates(ya, 210, "Give It To Me")[0]["score"] < 0, "'Give It To Ya' is not 'Give It To Me'")
+
+iou = [{"video_id": "e", "duration": 271, "channel": "Tentendo", "title": "IOU (Extended Mix)"},
+       {"video_id": "r", "duration": 232, "channel": "Sidekick", "title": "Tentendo - IOU (with BRUX)"}]
+check(rank_candidates(iou, 229, "IOU (with BRUX)")[0]["video_id"] == "e", "'(with X)' credit not required")
+orig = [{"video_id": "o", "duration": 396, "channel": "Label", "title": "Jay de Lys - Control (Original Mix)"},
+        {"video_id": "r", "duration": 218, "channel": "Jay de Lys - Topic", "title": "Control"}]
+check(rank_candidates(orig, 217, "Control")[0]["video_id"] == "o", "long 'Original Mix' counts as extended")
 
 with tempfile.TemporaryDirectory() as tmp:
     lib = Path(tmp)

@@ -45,6 +45,20 @@ def live_rows(db, tables, playlist_id):
     return sorted(rows, key=lambda r: int(r.TrackNo or 0))
 
 
+def existing_track(db, tables, playlist_id, wav, video_id):
+    """The collection track for this video, if any. Matches the exact path, or
+    any file named '... [<id>].<ext>' elsewhere (an earlier download in another
+    folder), preferring one already in the playlist so it isn't added twice."""
+    exact = db.get_content(FolderPath=str(wav)).first()
+    if exact:
+        return exact
+    same_id = (db.get_content()
+               .filter(tables.DjmdContent.FolderPath.like(f"% [{video_id}].%"),
+                       tables.DjmdContent.rb_local_deleted == 0).all())
+    in_playlist = [c for c in same_id if content_in_playlist(db, tables, playlist_id, c.ID)]
+    return (in_playlist or same_id or [None])[0]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("manifest")
@@ -73,7 +87,7 @@ def main() -> int:
         elif row is None or row.Content.FolderPath != t["folder_path"]:
             problems.append(f"{t['position']}: streaming entry is no longer in the playlist")
         else:
-            existing = db.get_content(FolderPath=str(wav)).first()
+            existing = existing_track(db, tables, pid, wav, t["pick"]["video_id"])
             plan.append((t, row, wav, existing))
     if problems:
         print("Cannot apply:\n  " + "\n  ".join(problems))
@@ -82,8 +96,14 @@ def main() -> int:
 
     print(f"{manifest['playlist']['path']}: {len(plan)} streaming entries -> WAVs ({args.mode})")
     for t, _, wav, existing in plan:
-        note = "  (already in collection)" if existing else ""
+        note = ""
+        if existing:
+            where = "already in this playlist" if content_in_playlist(db, tables, pid, existing.ID) \
+                else "already in collection"
+            note = f"  ({where}: {existing.FolderPath})"
         print(f"  {t['position']:>4}  {t['service']:<10} {t['name']}\n        -> {wav.name}{note}")
+        if existing and existing.FolderPath != str(wav):
+            print(f"        (uses the existing file; {wav.name} in the library folder is a spare copy)")
     if not args.apply:
         print("\nDry run. Pass --apply to write.")
         return 0
@@ -117,11 +137,14 @@ def main() -> int:
 
     # Adds first. In replace mode each WAV goes directly above its streaming
     # entry, which then shifts down one and is removed below.
+    used_paths, added = set(), 0
     try:
         for t, row, wav, existing in plan:
             content = existing or db.add_content(wav, Title=t["pick"].get("title") or t["name"])
+            used_paths.add(content.FolderPath)
             if content_in_playlist(db, tables, pid, content.ID):
                 continue
+            added += 1
             if args.mode == "replace":
                 db.session.refresh(row)
                 add_with_attr_bypass(db, pid, content.ID, track_no=int(row.TrackNo))
@@ -131,7 +154,7 @@ def main() -> int:
     except Exception as e:
         db.rollback()
         raise SystemExit(f"Adding WAVs failed, rolled back. Restore point: {backup}\nError: {e}")
-    print(f"Added {len(plan)} WAVs.")
+    print(f"Added {added} WAVs. {len(plan) - added} were already in the playlist.")
 
     if args.mode == "replace":
         try:
@@ -147,8 +170,7 @@ def main() -> int:
 
     final = live_rows(db, tables, pid)
     numbered = [int(r.TrackNo) for r in final] == list(range(1, len(final) + 1))
-    wav_paths = {str(w) for _, _, w, _ in plan}
-    present = wav_paths <= {r.Content.FolderPath for r in final}
+    present = used_paths <= {r.Content.FolderPath for r in final}
     print(f"\n{manifest['playlist']['path']} now has {len(final)} tracks. "
           f"Positions contiguous: {numbered}. All WAVs present: {present}.")
     if not (numbered and present):
