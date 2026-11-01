@@ -35,6 +35,10 @@ credit to him for the design and implementation.
   gather every file your collection points at into one folder you choose:
   collision-safe moves that never rename or overwrite, an undo manifest, and
   a guided Auto Relocate in rekordbox afterwards. Never writes the database.
+- **[rekordbox-stream-to-wav](.agents/skills/rekordbox/rekordbox-stream-to-wav/)** —
+  turn a playlist's Spotify and SoundCloud tracks into WAVs from YouTube:
+  matches each track (extended mixes first), reviews every pick with you,
+  downloads, and swaps each WAV into its streaming track's spot.
 
 ### ableton
 
@@ -73,6 +77,8 @@ See [AGENTS.md](AGENTS.md) for the full conventions, routing table, and how to
 add a skill.
 
 ## Getting started
+
+Full instructions, including using the skills from any folder: **[docs/SETUP.md](docs/SETUP.md)**.
 
 1. Clone this repo and install [Claude Code](https://claude.com/claude-code).
 2. Install what the skills you'll use need:
